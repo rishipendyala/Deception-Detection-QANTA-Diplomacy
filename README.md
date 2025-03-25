@@ -17,7 +17,9 @@ Before running the testing script, ensure the following prerequisites are met:
     - `torch`
     - `spacy`
     - `scikit-learn`
-    Run pip install -r requirements.txt in the terminal
+    Run: pip install -r requirements.txt in the terminal
+    Run this in terminal as well for spacy(en_core_web_sm): python3 -m spacy download en_core_web_sm
+
 2. **Pre-trained Model**: Ensure the pre-trained BiLSTM model file (`best_lstm_model.pth`) is available in the working directory.
 3. **GloVe Embeddings**: Download the GloVe embedding file (`glove.6B.300d.txt`) and provide the correct path in the code.
 4. **Data Files**: Ensure the `test_sm.jsonl` and `validation_sm.jsonl` files are available and correctly formatted.
