@@ -1,0 +1,7 @@
+numpy
+pandas
+jsonlib-python3
+spacy
+torch
+scikit-learn
+transformers

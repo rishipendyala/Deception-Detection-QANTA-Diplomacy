@@ -1,36 +1,14 @@
-# NLP-Project-Deception-Detection
+import numpy as np
+import pandas as pd
+import json
+import pandas as pd
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+import spacy
+from sklearn.metrics import f1_score
 
-## BiLSTM Model Testing
-
-This document provides a step-by-step explanation of how the BiLSTM model is tested using the provided Python code. The process involves loading pre-trained embeddings, preprocessing data, defining datasets, and evaluating the model.
-
----
-
-## Prerequisites
-
-Before running the testing script, ensure the following prerequisites are met:
-
-1. **Dependencies**: Install the required Python libraries:
-    - `numpy`
-    - `pandas`
-    - `json`
-    - `torch`
-    - `spacy`
-    - `scikit-learn`
-    Run pip install -r requirements.txt in the terminal
-2. **Pre-trained Model**: Ensure the pre-trained BiLSTM model file (`best_lstm_model.pth`) is available in the working directory.
-3. **GloVe Embeddings**: Download the GloVe embedding file (`glove.6B.300d.txt`) and provide the correct path in the code.
-4. **Data Files**: Ensure the `test_sm.jsonl` and `validation_sm.jsonl` files are available and correctly formatted.
-
----
-
-## Steps in the Testing Process
-
-### 1. Load and Preprocess Data
-
-The data is loaded from JSONL files (`test_sm.jsonl` and `validation_sm.jsonl`) and preprocessed to retain only the `message` and `sender_annotation` columns.
-
-```python
 def load_data(file_path):
     data = []
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -43,14 +21,11 @@ def preprocess_data(df):
     df = df[['message', 'sender_annotation']].copy()
     df['sender_annotation'] = df['sender_annotation'].astype(int)
     return df
-```
 
-### 2. Load GloVe Embeddings
+test_data = preprocess_data(load_data("data/test_sm.jsonl"))
+validation_data = preprocess_data(load_data("data/validation_sm.jsonl"))
 
-The GloVe embeddings are loaded into a dictionary for converting text into vector representations.
-
-```python
-def load_glove_embeddings(glove_path, embedding_dim=300):
+def load_glove_embeddings(glove_path, embedding_dim=200):
     word_to_vec = {}
     with open(glove_path, 'r', encoding='utf-8') as f:
         for line in f:
@@ -59,106 +34,107 @@ def load_glove_embeddings(glove_path, embedding_dim=300):
             vector = np.asarray(values[1:], dtype=np.float32)
             word_to_vec[word] = vector
     return word_to_vec
-```
 
-### 3. Convert Text to Embeddings
+glove_path = "glove.6B/glove.6B.300d.txt"
+glove_embeddings = load_glove_embeddings(glove_path, embedding_dim=300)
 
-The `message` column of the dataset is converted into fixed-size sequences of embeddings using the GloVe vectors.
+nlp = spacy.load("en_core_web_sm")
 
-```python
+def tokenize_text(text):
+    return [token.text.lower() for token in nlp(text)]
+
+MAX_SEQ_LEN = 50  # Define max sequence length
+
 def convert_text_to_embedding(text, glove_embeddings, embedding_dim=300, max_seq_len=100):
-    tokens = text.split()
+    tokens = text.split()  # Tokenization
     embeddings = [glove_embeddings[word] if word in glove_embeddings else np.zeros(embedding_dim) for word in tokens]
 
-    # Pad or truncate
+    # Pad or truncate to `max_seq_len`
     if len(embeddings) > max_seq_len:
         embeddings = embeddings[:max_seq_len]
     else:
         embeddings += [np.zeros(embedding_dim)] * (max_seq_len - len(embeddings))
 
-    return np.array(embeddings, dtype=np.float32)
+    return np.array(embeddings, dtype=np.float32)  # Ensure consistent dtype
 
 # Apply function to datasets
 test_data['embeddings'] = test_data['message'].apply(lambda x: convert_text_to_embedding(x, glove_embeddings))
 validation_data['embeddings'] = validation_data['message'].apply(lambda x: convert_text_to_embedding(x, glove_embeddings))
-```
 
-### 4. Create Custom Dataset Class
 
-The `MessageDataset` class is used to create PyTorch datasets for the test and validation data.
-
-```python
 class MessageDataset(Dataset):
     def __init__(self, df):
         self.embeddings = torch.tensor(np.stack(df['embeddings'].values), dtype=torch.float32)
         self.labels = torch.tensor(df['sender_annotation'].values, dtype=torch.float32)
-
+    
     def __len__(self):
         return len(self.labels)
-
+    
     def __getitem__(self, idx):
         return self.embeddings[idx], self.labels[idx]
-```
 
-### 5. Define and Load the BiLSTM Model
+# Create dataset objects
+test_dataset = MessageDataset(test_data)
+validation_dataset = MessageDataset(validation_data)
 
-The BiLSTM model is defined with an LSTM layer, dropout, and a fully connected layer. The model is then loaded with the pre-trained weights.
+# Create DataLoaders
+BATCH_SIZE = 32
+test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+val_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-```python
 class BiLSTMClassifier(nn.Module):
     def __init__(self, input_size=300, hidden_size=100, dropout=0.5):
         super(BiLSTMClassifier, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True, bidirectional=True)
         self.dropout = nn.Dropout(dropout)
-        self.fc = nn.Linear(hidden_size * 2, 1)
+        self.fc = nn.Linear(hidden_size * 2, 1)  # BiLSTM has 2x hidden_size output
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        lstm_out, _ = self.lstm(x)
-        pooled = torch.max(lstm_out, dim=1)[0]
+        lstm_out, _ = self.lstm(x)  
+        pooled = torch.max(lstm_out, dim=1)[0]  # Max pooling
         dropped = self.dropout(pooled)
         output = self.fc(dropped)
         return self.sigmoid(output).squeeze(1)
 
-# Load the model
+# Instantiate the model
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = BiLSTMClassifier().to(device)
+
 model.load_state_dict(torch.load("best_lstm_model.pth"))
+model.to(device)
 model.eval()
-```
 
-### 6. Evaluate the Model
-
-The model is evaluated on the test dataset, and performance metrics like accuracy and F1-score are computed.
-
-```python
+# Initialize lists for predictions and true labels
 all_preds = []
 all_labels = []
+
+# Evaluate on test data
+correct = 0
+total = 0
 
 with torch.no_grad():
     for inputs, labels in test_loader:
         inputs, labels = inputs.to(device), labels.to(device)
+
+        # Forward pass
         outputs = model(inputs)
+
+        # Convert probabilities to binary predictions (assuming binary classification)
         predicted = (outputs > 0.5).float()
 
         # Compute accuracy
         correct += (predicted == labels).sum().item()
         total += labels.size(0)
 
-        # Store predictions and labels
+        # Store predictions and labels for F1-score calculation
         all_preds.extend(predicted.cpu().numpy())
         all_labels.extend(labels.cpu().numpy())
 
+# Compute Accuracy
 accuracy = correct / total
 print(f"Test Accuracy: {accuracy:.4f}")
 
-# Compute Macro F1-score
+# Compute F1-score (Macro F1)
 f1 = f1_score(all_labels, all_preds, average='macro')
 print(f"Macro F1-score: {f1:.4f}")
-```
-
----
-
-## Output Metrics
-
-1. **Accuracy**: Displays the proportion of correct predictions.
-2. **Macro F1-score**: Measures the balance between precision and recall across all classes.
