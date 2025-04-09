@@ -5,3 +5,7 @@ spacy
 torch
 scikit-learn
 transformers
+spacy
+textstat
+language-tool-python
+textblob
