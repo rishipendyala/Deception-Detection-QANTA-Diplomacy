@@ -12,7 +12,7 @@ nltk.download('punkt')
 
 # Load spaCy English model
 nlp = spacy.load("en_core_web_sm")
-tool = language_tool_python.LanguageTool('en-US')
+# tool = language_tool_python.LanguageTool('en-US')
 
 def get_sentiment_polarity(text):
     blob = TextBlob(text)
