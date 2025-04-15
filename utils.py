@@ -5,7 +5,6 @@ import string
 import nltk
 from nltk.tokenize import word_tokenize, sent_tokenize
 import re
-import language_tool_python
 
 # Ensure required NLTK resources are downloaded
 nltk.download('punkt')

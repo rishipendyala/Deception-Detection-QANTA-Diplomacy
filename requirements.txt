@@ -1,6 +1,7 @@
-numpy
+numpy<2.0
+torch==2.1.0
+torchtext==0.16.0
 pandas
-jsonlib-python3
 spacy
 torch
 scikit-learn
