@@ -74,9 +74,9 @@ All features are normalized or scaled before model input.
 
 ### ✅ Final Model: BiLSTM Classifier
 
-- GloVe 300D Embeddings (frozen)
+- GloVe Embedding + Numerical Features
 - BiLSTM Layer (bidirectional, hidden_dim=100)
-- Max-pooling + Dropout (p=0.5)
+- Max-pooling + Dropout
 - Fully Connected Layer → Sigmoid
 - Loss: Binary Cross-Entropy
 
